@@ -12,10 +12,12 @@ export const calcularTotales = (items: any[], pax: number, tipoExperiencia: stri
 
     switch (item.pricingModel) {
       case 'per_person':
+        // price is per person, quantity is how many "units" per person (usually 1)
         itemTotal = price * pax * quantity;
         break;
       case 'per_piece':
-        itemTotal = price * quantity * pax; // Assuming quantity is pieces per person
+        // price is per unit, quantity is total units
+        itemTotal = price * quantity;
         break;
       case 'per_event':
         itemTotal = price * quantity;

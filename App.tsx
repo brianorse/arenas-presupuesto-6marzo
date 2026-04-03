@@ -5,8 +5,8 @@ import { queryClientInstance } from '@/lib/query-client'
 import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
-import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import { AuthProvider, useAuth } from './firebase';
+import { LOGO_URL } from '@/utils';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -19,29 +19,39 @@ const LayoutWrapper = ({ children, currentPageName }: { children: React.ReactNod
 const RouteAny = Route as any;
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { user, loading } = useAuth();
 
-  // Show loading spinner while checking app public settings or auth
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  if (loading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#faf9f6]">
+        <div className="relative mb-8">
+          {/* Subtle gradient background for the logo */}
+          <div className="absolute inset-0 bg-[#654935]/10 rounded-full blur-3xl animate-pulse" />
+          
+          {/* Logo with a gentle bounce animation */}
+          <div className="relative animate-bounce">
+            <img 
+              src={LOGO_URL} 
+              alt="Eventing" 
+              className="w-24 h-24 object-contain drop-shadow-2xl"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        </div>
+        
+        {/* Progress indicator */}
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-48 h-0.5 bg-[#e8ddd0] rounded-full overflow-hidden relative">
+            <div className="absolute inset-0 bg-[#654935] w-1/3 animate-[shimmer_2s_infinite] rounded-full" />
+          </div>
+          <p className="text-[#654935] text-[10px] font-bold tracking-[0.4em] uppercase opacity-50">
+            Cargando experiencia
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Handle authentication errors
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
-  }
-
-  // Render the main app
   return (
     <Routes>
       <Route path="/" element={
@@ -50,14 +60,12 @@ const AuthenticatedApp = () => {
         </LayoutWrapper>
       } />
       {Object.entries(Pages).map(([path, Page]) => {
-        // @ts-ignore
         return (
           <RouteAny
             key={path}
             path={`/${path}`}
             element={
               <LayoutWrapper currentPageName={path}>
-                {/* @ts-ignore */}
                 <Page />
               </LayoutWrapper>
             }

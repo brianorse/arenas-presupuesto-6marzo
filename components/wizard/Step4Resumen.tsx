@@ -77,7 +77,7 @@ export default function Step4Resumen({ client, selectedItems, onBack, onSave, sa
                             </div>
                           </div>
                           <div className="font-bold text-[#654935] bg-[#fffbf5] px-3 py-1 rounded-lg border border-[#e8ddd0]">
-                            {(item.price * item.quantity * (item.pricingModel === 'per_person' || item.pricingModel === 'per_piece' ? client.pax : 1)).toFixed(0)}€
+                            {(item.price * item.quantity * (item.pricingModel === 'per_person' ? client.pax : 1)).toFixed(0)}€
                           </div>
                         </div>
                       ))}

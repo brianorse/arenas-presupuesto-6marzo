@@ -3,8 +3,11 @@ import autoTable from 'jspdf-autotable';
 import { CATEGORY_LABELS } from '../components/catalogo/CATALOG_DATA';
 import { LOGO_URL } from './index';
 
+const LOGO_URL_PDF = LOGO_URL;
+const WEDDING_COVER_IMAGE = 'https://picsum.photos/seed/wedding-catering/1920/1080';
+
 // Helper to load image
-const loadImage = (url: string): Promise<string> => {
+const loadImage = (url: string, removeBackground: boolean = false): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
@@ -16,12 +19,33 @@ const loadImage = (url: string): Promise<string> => {
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg'));
+        
+        if (removeBackground) {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          // Simple black background removal
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            // If pixel is very dark, make it transparent (increased threshold for cleaner removal)
+            if (r < 60 && g < 60 && b < 60) {
+              data[i + 3] = 0;
+            }
+          }
+          ctx.putImageData(imageData, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } else {
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        }
       } else {
         reject('Canvas context not available');
       }
     };
-    img.onerror = reject;
+    img.onerror = (e) => {
+      console.error("Error loading image for PDF:", url, e);
+      reject(e);
+    };
   });
 };
 
@@ -45,50 +69,69 @@ export const generateBudgetPDF = async (presupuesto: any) => {
   };
 
   // --- Page 1: Cover ---
-  // Background Color (No Image)
-  doc.setFillColor(colors.primary);
-  doc.rect(0, 0, width, height, 'F');
+  const isBoda = presupuesto.tipo_evento === 'boda';
 
-  // Overlay (Optional, but keeping consistent style)
-  doc.setFillColor(0, 0, 0);
-  doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
-  doc.rect(0, 0, width, height, 'F');
-  doc.setGState(new (doc as any).GState({ opacity: 1 }));
+  if (isBoda) {
+    try {
+      const coverData = await loadImage(WEDDING_COVER_IMAGE);
+      doc.addImage(coverData, 'JPEG', 0, 0, width, height, undefined, 'FAST');
+      
+      // Dark overlay for readability
+      doc.setFillColor(0, 0, 0);
+      doc.setGState(new (doc as any).GState({ opacity: 0.5 }));
+      doc.rect(0, 0, width, height, 'F');
+      doc.setGState(new (doc as any).GState({ opacity: 1 }));
+    } catch (e) {
+      doc.setFillColor(colors.primary);
+      doc.rect(0, 0, width, height, 'F');
+    }
+  } else {
+    // Background Color (No Image)
+    doc.setFillColor(colors.primary);
+    doc.rect(0, 0, width, height, 'F');
+  }
 
   // Border
   doc.setDrawColor(212, 175, 55); // Gold
-  doc.setLineWidth(1);
-  doc.rect(10, 10, width - 20, height - 20);
+  doc.setLineWidth(0.5);
+  doc.rect(8, 8, width - 16, height - 16);
 
   // Logo
   try {
-    const logoData = await loadImage(LOGO_URL);
-    const logoWidth = 50; // Adjust size
-    const logoHeight = 50; // Adjust size
-    doc.addImage(logoData, 'PNG', (width - logoWidth) / 2, height / 2 - 35, logoWidth, logoHeight);
+    // Try to remove background for the logo to make it look better on the cover
+    const logoData = await loadImage(LOGO_URL_PDF, true);
+    const logoWidth = 80;
+    const logoHeight = 80;
+    // Move logo slightly higher to give more space
+    doc.addImage(logoData, 'PNG', (width - logoWidth) / 2, height / 2 - 70, logoWidth, logoHeight);
   } catch (e) {
-    // Fallback to text if image fails
     doc.setFont('times', 'italic');
-    doc.setTextColor(212, 175, 55); // Gold
-    doc.setFontSize(60);
-    doc.text('Arenas Obrador', width / 2, height / 2 - 10, { align: 'center' });
-  }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12);
-  doc.text('DONDE LA EXCELENCIA CULINARIA SE CONVIERTE EN CELEBRACIÓN', width / 2, height / 2 + 10, { align: 'center' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(14);
-  doc.text(presupuesto.cliente_nombre || 'Cliente', width / 2, height / 2 + 40, { align: 'center' });
-  doc.text(new Date().toLocaleDateString('es-ES'), width / 2, height / 2 + 50, { align: 'center' });
-  if (presupuesto.codigo) {
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(12);
     doc.setTextColor(212, 175, 55);
-    doc.text(`REF: ${presupuesto.codigo}`, width / 2, height / 2 + 60, { align: 'center' });
+    doc.setFontSize(50);
+    doc.text('CateringApp', width / 2, height / 2 - 10, { align: 'center' });
   }
+
+  // Cover Text
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  // Slogan - perfectly centered
+  doc.text('DONDE LA EXCELENCIA CULINARIA SE CONVIERTE EN CELEBRACIÓN', width / 2, height / 2 + 30, { align: 'center', charSpace: 1 });
+
+  // Client Name - perfectly centered
+  doc.setFontSize(18);
+  const clientName = (presupuesto.cliente_nombre || 'CLIENTE').trim().toUpperCase();
+  doc.text(clientName, width / 2, height / 2 + 50, { align: 'center' });
+  
+  // Date - perfectly centered
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12);
+  doc.text(new Date().toLocaleDateString('es-ES'), width / 2, height / 2 + 60, { align: 'center' });
+
+  // Reference - perfectly centered
+  doc.setFont('courier', 'bold');
+  doc.setTextColor(212, 175, 55);
+  doc.text(`REF: ${presupuesto.codigo || presupuesto.id.substring(0, 5).toUpperCase()}`, width / 2, height / 2 + 70, { align: 'center' });
 
   // --- Page 2: Ficha del Evento & Contenido ---
   doc.addPage();
@@ -156,7 +199,7 @@ export const generateBudgetPDF = async (presupuesto: any) => {
   // Footer
   doc.setFontSize(8);
   doc.setTextColor(colors.secondary);
-  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | Arenas Obrador`, 20, height - 10);
+  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | CateringApp`, 20, height - 10);
   doc.text('1', width - 20, height - 10);
 
   // --- Page 3: Así Funciona ---
@@ -209,7 +252,7 @@ export const generateBudgetPDF = async (presupuesto: any) => {
   // Footer
   doc.setFontSize(8);
   doc.setTextColor(colors.secondary);
-  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | Arenas Obrador`, 20, height - 10);
+  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | CateringApp`, 20, height - 10);
   doc.text('2', width - 20, height - 10);
 
   // --- Page 4: Tu Selección ---
@@ -238,40 +281,45 @@ export const generateBudgetPDF = async (presupuesto: any) => {
 
   let itemY = 90;
   const col1X = 20;
-  const col2X = 150;
-  let currentX = col1X;
+  const col2X = 155;
+  const itemsPerPage = 12; // Increased to fit more
+  const itemsPerColumn = 6;
 
   presupuesto.items_seleccionados.forEach((item: any, index: number) => {
-    if (index > 0 && index % 8 === 0) {
-        doc.addPage();
-        doc.setFillColor(colors.bg);
-        doc.rect(0, 0, width, height, 'F');
-        itemY = 40;
+    const pageIndex = Math.floor(index / itemsPerPage);
+    const indexInPage = index % itemsPerPage;
+    const isSecondColumn = indexInPage >= itemsPerColumn;
+    const rowIndex = isSecondColumn ? indexInPage - itemsPerColumn : indexInPage;
+
+    if (index > 0 && index % itemsPerPage === 0) {
+      doc.addPage();
+      doc.setFillColor(colors.bg);
+      doc.rect(0, 0, width, height, 'F');
+      itemY = 40;
     }
 
-    // Determine column
-    currentX = (index % 8 < 4) ? col1X : col2X;
-    if (index % 4 === 0 && index % 8 !== 0) itemY = 90; // Reset Y for second column
-    if (index % 8 === 0 && index !== 0) itemY = 40; // Reset Y for new page
+    const currentX = isSecondColumn ? col2X : col1X;
+    const currentY = (index % itemsPerPage === 0) ? (pageIndex === 0 ? 90 : 40) : (rowIndex === 0 ? (pageIndex === 0 ? 90 : 40) : 0);
+    
+    // Calculate Y more reliably
+    const yPos = (pageIndex === 0 ? 90 : 40) + (rowIndex * 22);
 
     doc.setFont('times', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(colors.text);
-    doc.text(item.name, currentX, itemY);
+    doc.text(item.name.toUpperCase(), currentX, yPos);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(colors.secondary);
     const unit = item.pricingModel === 'per_person' ? 'ud/pers' : 'ud';
-    doc.text(`${item.quantity} ${unit} | ${item.price.toFixed(2)}€`, currentX, itemY + 6);
-
-    itemY += 20;
+    doc.text(`${item.quantity} ${unit} | ${item.price.toFixed(2)}€`, currentX, yPos + 6);
   });
 
   // Footer
   doc.setFontSize(8);
   doc.setTextColor(colors.secondary);
-  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | Arenas Obrador`, 20, height - 10);
+  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | CateringApp`, 20, height - 10);
   doc.text('3', width - 20, height - 10);
 
   // --- Page 5: Presupuesto ---
@@ -293,7 +341,7 @@ export const generateBudgetPDF = async (presupuesto: any) => {
 
   // Summary Box
   doc.setFillColor(colors.white);
-  doc.roundedRect(20, 65, 80, 80, 2, 2, 'F');
+  doc.roundedRect(20, 65, 85, 90, 2, 2, 'F');
   
   doc.setFont('times', 'bold');
   doc.setFontSize(14);
@@ -305,29 +353,29 @@ export const generateBudgetPDF = async (presupuesto: any) => {
   doc.setTextColor(colors.secondary);
   
   doc.text('Comensales', 30, 95);
-  doc.text(`${presupuesto.pax}`, 90, 95, { align: 'right' });
+  doc.text(`${presupuesto.pax}`, 95, 95, { align: 'right' });
   
   doc.text('Base Imponible', 30, 105);
-  doc.text(`${presupuesto.total.toFixed(2)}€`, 90, 105, { align: 'right' });
+  doc.text(`${presupuesto.total.toFixed(2)}€`, 95, 105, { align: 'right' });
   
   doc.text('IVA (10%)', 30, 115);
-  doc.text(`${(presupuesto.total * 0.10).toFixed(2)}€`, 90, 115, { align: 'right' });
+  doc.text(`${(presupuesto.total * 0.10).toFixed(2)}€`, 95, 115, { align: 'right' });
 
   doc.setDrawColor(colors.secondary);
-  doc.line(30, 120, 90, 120);
+  doc.line(30, 122, 95, 122);
 
   doc.setFont('times', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setTextColor(colors.primary);
-  doc.text('TOTAL ESTIMADO', 30, 130);
-  doc.setFontSize(16);
-  doc.text(`${(presupuesto.total * 1.10).toFixed(2)}€`, 90, 130, { align: 'right' });
+  doc.text('TOTAL ESTIMADO', 30, 135);
+  doc.setFontSize(18);
+  doc.text(`${(presupuesto.total * 1.10).toFixed(2)}€`, 95, 135, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(colors.secondary);
   const perPax = (presupuesto.total * 1.10) / (presupuesto.pax || 1);
-  doc.text(`Aprox. ${perPax.toFixed(2)}€ / persona (con IVA)`, 90, 140, { align: 'right' });
+  doc.text(`Aprox. ${perPax.toFixed(2)}€ / persona (con IVA)`, 95, 145, { align: 'right' });
 
   // Detailed Table
   const tableColumn = ["CONCEPTO", "CANTIDAD", "TOTAL"];
@@ -384,7 +432,7 @@ export const generateBudgetPDF = async (presupuesto: any) => {
   // Footer
   doc.setFontSize(8);
   doc.setTextColor(colors.secondary);
-  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | Arenas Obrador`, 20, height - 10);
+  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | CateringApp`, 20, height - 10);
   doc.text('4', width - 20, height - 10);
 
   // --- Page 6: Próximos Pasos ---
@@ -444,12 +492,12 @@ export const generateBudgetPDF = async (presupuesto: any) => {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(190, 50, 50); // Reddish for contact
   doc.text('697 967 853', 160, 145);
-  doc.text('info@arenasobrador.com', 160, 155);
+  doc.text('info@cateringapp.com', 160, 155);
 
   // Footer
   doc.setFontSize(8);
   doc.setTextColor(colors.secondary);
-  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | Arenas Obrador`, 20, height - 10);
+  doc.text(`Propuesta creativa para ${presupuesto.cliente_nombre} | CateringApp`, 20, height - 10);
   doc.text('5', width - 20, height - 10);
 
   // --- Page 7: Back Cover ---
@@ -464,8 +512,8 @@ export const generateBudgetPDF = async (presupuesto: any) => {
   
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(12);
-  doc.text('www.arenasobrador.com', width / 2, height / 2 + 20, { align: 'center' });
+  doc.text('www.cateringapp.com', width / 2, height / 2 + 20, { align: 'center' });
 
   // Save
-  doc.save(`Presupuesto_Arenas_${presupuesto.cliente_nombre || 'Cliente'}.pdf`);
+  doc.save(`Presupuesto_CateringApp_${presupuesto.cliente_nombre || 'Cliente'}.pdf`);
 };

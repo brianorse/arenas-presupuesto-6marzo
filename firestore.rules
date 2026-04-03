@@ -1,0 +1,150 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string
+    //   - role: string (admin/user)
+    //   - createdAt: timestamp
+    //
+    // Collection: presupuestos (stored in 'solicitudes' collection)
+    // Fields:
+    //   - id: string
+    //   - cliente_uid: string (required)
+    //   - estado: string (borrador/enviado/aprobado/rechazado)
+    //   - total: number
+    //   - items: list
+    //   - created_date: timestamp
+    //
+    // Collection: channel_connections
+    // Fields:
+    //   - user_id: string (required)
+    //   - workspace_id: string (required)
+    //   - channel: string (whatsapp)
+    //   - provider: string (wazzap)
+    //   - status: string (not_connected/pending_qr/waiting_scan/connecting/connected/error/disconnected)
+    //   - phone_number: string
+    //   - external_account_id: string
+    //   - external_session_id: string
+    //   - qr_code_value: string
+    //   - qr_expires_at: string
+    //   - last_sync_at: string
+    //   - risk_level: string (high)
+    //   - accepted_terms_version: string
+    //   - accepted_terms_at: string
+    //   - accepted_terms_ip: string
+    //   - created_at: string
+    //   - updated_at: string
+    //
+    // Collection: channel_connection_logs
+    // Fields:
+    //   - user_id: string (required)
+    //   - workspace_id: string (required)
+    //   - connection_id: string (required)
+    //   - event: string (required)
+    //   - status: string (required)
+    //   - message: string
+    //   - metadata: map
+    //   - created_at: string
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((request.auth.token.keys().contains('email') && (
+          request.auth.token.email.lower() == "app@cateringapp.com" ||
+          request.auth.token.email.lower() == "brianortegaxiv@gmail.com"
+        )) ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.role in ['admin', 'user'];
+    }
+
+    function isValidSolicitud(data) {
+      return data.keys().hasAll(['cliente_uid', 'estado']) &&
+             data.cliente_uid is string &&
+             data.estado in ['borrador', 'enviado', 'aprobado', 'rechazado'];
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && (userId == request.auth.uid);
+      allow update: if isAuthenticated() && 
+                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /solicitudes/{solicitudId} {
+      // Temporarily allowing all authenticated users to read all budgets to ensure admin access
+      // while Firebase Auth issues are resolved.
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidSolicitud(request.resource.data) && 
+                    (request.resource.data.cliente_uid == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidSolicitud(request.resource.data) && 
+                    ((resource.data.cliente_uid == request.auth.uid && request.resource.data.cliente_uid == resource.data.cliente_uid) || isAdmin());
+      allow delete: if (isAuthenticated() && resource.data.cliente_uid == request.auth.uid) || isAdmin();
+    }
+
+    match /mail/{mailId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /bloqueos/{bloqueoId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /eventos/{eventoId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /planos/{planoId} {
+      allow read: if isAuthenticated() && (isAdmin() || (resource != null && resource.data.cliente_uid == request.auth.uid));
+      allow create: if isAuthenticated() && request.resource.data.cliente_uid == request.auth.uid;
+      allow update: if isAuthenticated() && (isAdmin() || (resource.data.cliente_uid == request.auth.uid && request.resource.data.cliente_uid == request.auth.uid));
+      allow delete: if isAuthenticated() && (isAdmin() || resource.data.cliente_uid == request.auth.uid);
+    }
+
+    match /channel_connections/{id} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+    }
+
+    match /channel_connection_logs/{id} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

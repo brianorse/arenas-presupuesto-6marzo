@@ -48,27 +48,49 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import AdminPanel from './pages/AdminPanel';
+import Ajustes from './pages/Ajustes';
+import Automatizaciones from './pages/Automatizaciones';
+import Cocina from './pages/Cocina';
+import Comunicaciones from './pages/Comunicaciones';
 import DetallePresupuesto from './pages/DetallePresupuesto';
+import Eventos from './pages/Eventos';
+import Finanzas from './pages/Finanzas';
 import GestionClientes from './pages/GestionClientes';
-import Home from './pages/Home';
+import GestionMenu from './pages/GestionMenu';
 import Login from './pages/Login';
+import MenuEvento from './pages/MenuEvento';
 import MisPresupuestos from './pages/MisPresupuestos';
 import NuevoPresupuesto from './pages/NuevoPresupuesto';
+import Perfil from './pages/Perfil';
+import PlanificadorSala from './pages/PlanificadorSala';
+import PoliticaPrivacidad from './pages/PoliticaPrivacidad';
+import Registro from './pages/Registro';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AdminPanel": AdminPanel,
+    "Ajustes": Ajustes,
+    "Automatizaciones": Automatizaciones,
+    "Cocina": Cocina,
+    "Comunicaciones": Comunicaciones,
     "DetallePresupuesto": DetallePresupuesto,
+    "Eventos": Eventos,
+    "Finanzas": Finanzas,
     "GestionClientes": GestionClientes,
-    "Home": Home,
+    "GestionMenu": GestionMenu,
     "Login": Login,
+    "MenuEvento": MenuEvento,
     "MisPresupuestos": MisPresupuestos,
     "NuevoPresupuesto": NuevoPresupuesto,
+    "Perfil": Perfil,
+    "PlanificadorSala": PlanificadorSala,
+    "PoliticaPrivacidad": PoliticaPrivacidad,
+    "Registro": Registro,
 }
 
 export const pagesConfig = {
-    mainPage: "Home",
+    mainPage: "Login",
     Pages: PAGES,
     Layout: __Layout,
 };

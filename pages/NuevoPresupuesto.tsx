@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { db, useAuth } from '@/firebase';
+import { collection, addDoc, updateDoc, doc, getDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { calcularTotales } from '../components/presupuesto/calcularTotales';
 import Step1Datos from '../components/wizard/Step1Datos';
 import Step2Evento from '../components/wizard/Step2Evento';
@@ -7,11 +8,12 @@ import Step3Menu from '../components/wizard/Step3Menu';
 import Step4Resumen from '../components/wizard/Step4Resumen';
 import { createPageUrl, LOGO_URL, generateBudgetCode } from '@/utils';
 import { generateBudgetPDF } from '@/utils/pdfGenerator';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 
 const STEPS = ['Tus datos', 'Tipo evento', 'Elige menú', 'Resumen'];
 
 export default function NuevoPresupuesto() {
+  const { user, loading: authLoading } = useAuth();
   const [step, setStep] = useState(0);
   const [client, setClient] = useState({
     cliente_nombre: '', cliente_email: '', cliente_telefono: '',
@@ -24,13 +26,17 @@ export default function NuevoPresupuesto() {
   const [savedBudget, setSavedBudget] = useState(null);
 
   useEffect(() => {
+    if (!authLoading && !user) {
+      window.location.href = createPageUrl('Login');
+      return;
+    }
+
     const init = async () => {
-      const me = await base44.auth.me();
-      if (me) {
+      if (user) {
         setClient(prev => ({
           ...prev,
-          cliente_nombre: me.full_name || '',
-          cliente_email: me.email || ''
+          cliente_nombre: user.displayName || '',
+          cliente_email: user.email || ''
         }));
       }
 
@@ -38,9 +44,17 @@ export default function NuevoPresupuesto() {
       const params = new URLSearchParams(window.location.search);
       const id = params.get('id');
       if (id) {
-        const data = await base44.entities.Presupuesto.filter({ id });
-        if (data && data.length > 0) {
-          const budget = data[0];
+        const docRef = doc(db, 'solicitudes', id);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          const budget = docSnap.data();
+          // Security check: only owner or admin can edit
+          if (budget.cliente_uid !== user?.uid && user?.role !== 'admin') {
+            window.location.href = createPageUrl('MisPresupuestos');
+            return;
+          }
+
           setClient({
             cliente_nombre: budget.cliente_nombre || '',
             cliente_email: budget.cliente_email || '',
@@ -59,9 +73,10 @@ export default function NuevoPresupuesto() {
       }
     };
     init();
-  }, []);
+  }, [user, authLoading]);
 
   const handleSave = async () => {
+    if (!user) return;
     setSaving(true);
     const totales = calcularTotales(selectedItems, client.pax, client.tipo_experiencia);
     const titulo = `${client.tipo_evento ? client.tipo_evento.charAt(0).toUpperCase() + client.tipo_evento.slice(1) : 'Evento'} - ${client.cliente_nombre} (${client.pax} pax)`;
@@ -70,6 +85,7 @@ export default function NuevoPresupuesto() {
       titulo,
       estado: 'borrador',
       ...client,
+      cliente_uid: user.uid,
       items_seleccionados: selectedItems,
       total_comida: totales.food,
       total_bebidas: totales.drinks,
@@ -77,25 +93,92 @@ export default function NuevoPresupuesto() {
       total_personal: totales.staff,
       total_logistica: totales.logistics,
       total: totales.total,
-      total_por_pax: totales.perPax
+      total_por_pax: totales.perPax,
+      updated_at: serverTimestamp()
     };
 
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
 
-    if (id) {
-      await base44.entities.Presupuesto.update(id, budgetData);
-      setSavedBudget({ ...budgetData, id });
-    } else {
-      const codigo = generateBudgetCode();
-      const newBudget = { ...budgetData, codigo };
-      const created = await base44.entities.Presupuesto.create(newBudget);
-      setSavedBudget(created);
-    }
+    try {
+      if (id) {
+        await updateDoc(doc(db, 'solicitudes', id), budgetData);
+        setSavedBudget({ ...budgetData, id });
+      } else {
+        const codigo = generateBudgetCode();
+        const newBudget = { 
+          ...budgetData, 
+          codigo,
+          created_date: serverTimestamp()
+        };
+        const docRef = await addDoc(collection(db, 'solicitudes'), newBudget);
+        setSavedBudget({ ...newBudget, id: docRef.id });
 
-    setSaving(false);
-    setSaved(true);
+        // Notify admin of new budget request
+        try {
+          await addDoc(collection(db, 'mail'), {
+            to: ['app@cateringapp.com', 'BrianOrtegaXIV@gmail.com'],
+            message: {
+              subject: `📝 Nuevo presupuesto: ${client.cliente_nombre}`,
+              text: `Nuevo presupuesto recibido.\n\nCliente: ${client.cliente_nombre}\nEvento: ${client.tipo_evento}\nPersonas: ${client.pax}\nTotal: ${totales.total.toFixed(2)}€\n\nVer detalles en el panel de administración.`,
+              html: `
+                <div style="font-family: sans-serif; color: #3d2b1f; max-width: 600px; margin: 0 auto; border: 1px solid #e8ddd0; border-radius: 16px; overflow: hidden;">
+                  <div style="background-color: #654935; padding: 20px; text-align: center;">
+                    <h2 style="color: #ffffff; margin: 0;">Nuevo Presupuesto</h2>
+                  </div>
+                  <div style="padding: 24px; background-color: #ffffff;">
+                    <p>Has recibido un nuevo presupuesto:</p>
+                    <table style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0; color: #8c7a6b;">Cliente:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0; font-weight: bold;">${client.cliente_nombre}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0; color: #8c7a6b;">Email:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0;">${client.cliente_email}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0; color: #8c7a6b;">Evento:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0;">${client.tipo_evento}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0; color: #8c7a6b;">Personas:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0;">${client.pax} pax</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0; color: #8c7a6b;">Total estimado:</td>
+                        <td style="padding: 8px 0; border-bottom: 1px solid #f5f5f0; font-weight: bold; color: #654935;">${totales.total.toFixed(2)}€</td>
+                      </tr>
+                    </table>
+                    <div style="margin-top: 24px; text-align: center;">
+                      <a href="https://ais-dev-4b7cyejxnzwa2wxjo2ntyd-8963002671.europe-west3.run.app/DetallePresupuesto?id=${docRef.id}" style="background-color: #654935; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Ver Detalles del Presupuesto</a>
+                    </div>
+                  </div>
+                </div>
+              `
+            },
+            createdAt: serverTimestamp()
+          });
+        } catch (mailErr) {
+          console.error("Error sending admin notification for budget:", mailErr);
+        }
+      }
+      setSaved(true);
+    } catch (error) {
+      console.error("Error saving budget:", error);
+      alert("Error al guardar el presupuesto.");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-[#faf9f6]">
+        <Loader2 className="w-10 h-10 animate-spin text-[#654935]" />
+      </div>
+    );
+  }
 
   if (saved) {
     return (
@@ -138,9 +221,9 @@ export default function NuevoPresupuesto() {
       <div className="bg-white border-b border-[#d6c7b2] px-4 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={LOGO_URL} alt="Arenas Obrador" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
+            <img src={LOGO_URL} alt="CateringApp" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
             <div>
-              <div className="font-bold text-[#654935]">Arenas Obrador</div>
+              <div className="font-bold text-[#654935]">CateringApp</div>
               <div className="text-xs text-[#8c7a6b]">Gestor de Presupuestos</div>
             </div>
           </div>

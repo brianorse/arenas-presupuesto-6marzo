@@ -1,11 +1,27 @@
-import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
-import { createPageUrl, LOGO_URL } from '@/utils';
-import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { auth } from '@/firebase';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { createPageUrl } from '@/utils';
+import { Loader2 } from 'lucide-react';
+
+const Logo = () => (
+  <div className="flex flex-col items-center gap-1">
+    <div className="relative">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#3d2b1f]">
+        <path d="M6 13.5C6 13.5 6 10 12 10C18 10 18 13.5 18 13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M12 10V7M12 7C13.1046 7 14 6.10457 14 5C14 3.89543 13.1046 3 12 3C10.8954 3 10 3.89543 10 5C10 6.10457 10.8954 7 12 7Z" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M4 14C4 14 4 16 12 16C20 16 20 14 20 14" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M5 17H19V19C19 20.1046 18.1046 21 17 21H7C5.89543 21 5 20.1046 5 19V17Z" stroke="currentColor" strokeWidth="1.5"/>
+      </svg>
+    </div>
+    <span className="text-4xl font-serif font-bold text-[#3d2b1f] tracking-tight">Eventing</span>
+  </div>
+);
 
 export default function Login() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('Catering2026!'); // Default for demo/master
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -13,24 +29,16 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError('');
-
+    
+    let loginEmail = email.trim().toLowerCase();
+    if (loginEmail === 'admin') loginEmail = 'app@cateringapp.com';
+    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock login logic
-      if (email === 'chaima@arenas.com' && password === 'admin') {
-        // Admin login
-        await base44.auth.login('chaima@arenas.com', 'admin');
-        window.location.href = createPageUrl('AdminPanel');
-      } else if (email && password) {
-        // User login
-        await base44.auth.login(email, 'user');
-        window.location.href = createPageUrl('MisPresupuestos');
-      } else {
-        throw new Error('Credenciales inválidas');
-      }
-    } catch (err) {
+      await signInWithEmailAndPassword(auth, loginEmail, password);
+      const isMaster = (loginEmail === 'app@cateringapp.com' || loginEmail === 'brianortegaxiv@gmail.com');
+      window.location.href = createPageUrl(isMaster ? 'AdminPanel' : 'MisPresupuestos');
+    } catch (err: any) {
+      console.error("Login Error:", err);
       setError('Email o contraseña incorrectos');
     } finally {
       setLoading(false);
@@ -38,109 +46,92 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* Left Side - Image & Brand */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-[#1a0f0a] overflow-hidden">
-        <div 
-          className="absolute inset-0 bg-cover bg-center opacity-60"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1555244162-803834f70033?q=80&w=2070&auto=format&fit=crop')" }}
-        />
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white h-full w-full">
-          <div className="flex items-center gap-3">
-            <img src={LOGO_URL} alt="Arenas Obrador" className="w-12 h-12 object-contain bg-white/10 rounded-full p-1 border border-[#a87c50]" referrerPolicy="no-referrer" />
-            <span className="font-bold text-xl tracking-wide">Arenas Obrador</span>
-          </div>
-          
-          <div className="max-w-md">
-            <h1 className="text-5xl font-bold font-serif mb-6 leading-tight">
-              Crea momentos inolvidables
-            </h1>
-            <p className="text-lg text-white/80 font-light leading-relaxed">
-              Accede a tu espacio personal para gestionar tus eventos, personalizar menús y descargar tus presupuestos al instante.
-            </p>
-          </div>
+    <div className="min-h-screen flex flex-col items-center bg-[#d9c5a0] relative overflow-hidden font-sans">
+      {/* Background Pattern Overlay */}
+      <div 
+        className="absolute inset-0 opacity-10 pointer-events-none"
+        style={{ 
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3zm40 40c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3zm30-30c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3zM20 80c2 0 3 1 3 3s-1 3-3 3-3-1-3-3 1-3 3-3z' fill='%233d2b1f' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E")`,
+          backgroundSize: '200px 200px'
+        }}
+      />
 
-          <div className="text-xs text-white/40 uppercase tracking-widest">
-            © 2024 Arenas Obrador Catering
-          </div>
-        </div>
+      {/* Logo Section */}
+      <div className="pt-16 pb-12 relative z-10">
+        <Logo />
       </div>
 
-      {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-[#faf9f6]">
-        <div className="w-full max-w-md space-y-8">
-          <div className="text-center lg:text-left">
-            <h2 className="text-3xl font-bold text-[#3d2b1f] mb-2">Bienvenido de nuevo</h2>
-            <p className="text-[#8c7a6b]">Ingresa a tu cuenta para continuar</p>
+      {/* Login Card */}
+      <div className="w-full max-w-[400px] bg-[#3d2b1f] rounded-t-[40px] flex-1 flex flex-col items-center p-8 relative z-10 shadow-2xl">
+        <h1 className="text-white text-4xl font-bold mb-2">¡Hola!</h1>
+        <p className="text-white/60 text-sm mb-10">Empecemos por tu nombre y mail</p>
+
+        <form onSubmit={handleLogin} className="w-full space-y-4">
+          <div className="relative">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-[#3d2b1f] border border-[#654935] rounded-xl px-4 py-4 text-white placeholder:text-white/30 focus:outline-none focus:border-[#a89b78] transition-colors"
+              placeholder="Nombre"
+            />
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-[#654935] ml-1">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#8c7a6b]" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-[#e8ddd0] bg-white focus:border-[#654935] focus:ring-4 focus:ring-[#654935]/10 outline-none transition-all"
-                  placeholder="tu@email.com"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-[#654935] ml-1">Contraseña</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#8c7a6b]" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-[#e8ddd0] bg-white focus:border-[#654935] focus:ring-4 focus:ring-[#654935]/10 outline-none transition-all"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="p-4 rounded-xl bg-red-50 text-red-600 text-sm font-medium flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 rounded-2xl bg-[#654935] hover:bg-[#4a3627] text-white font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  Iniciar Sesión <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="text-center text-sm text-[#8c7a6b]">
-            ¿No tienes cuenta?{' '}
-            <a href={createPageUrl('NuevoPresupuesto')} className="font-bold text-[#654935] hover:underline">
-              Crear un presupuesto sin registro
-            </a>
+          <div className="relative">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-[#3d2b1f] border border-[#654935] rounded-xl px-4 py-4 text-white placeholder:text-white/30 focus:outline-none focus:border-[#a89b78] transition-colors"
+              placeholder="Mail"
+              required
+            />
           </div>
-          
-          <div className="mt-8 pt-8 border-t border-[#e8ddd0] text-center">
-             <p className="text-xs text-[#8c7a6b] mb-2">Credenciales de prueba:</p>
-             <div className="flex justify-center gap-4 text-xs font-mono bg-white p-3 rounded-lg border border-[#e8ddd0] inline-block">
-                <div><span className="font-bold text-[#654935]">Admin:</span> chaima@arenas.com / admin</div>
-                <div><span className="font-bold text-[#654935]">User:</span> user@demo.com / user</div>
-             </div>
-          </div>
+
+          {error && (
+            <p className="text-red-400 text-xs text-center">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#a89b78] hover:bg-[#968a6a] text-white font-bold py-4 rounded-full transition-all transform active:scale-95 flex items-center justify-center gap-2 mt-4"
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'ENVIAR'}
+          </button>
+        </form>
+
+        <div className="w-full flex items-center gap-4 my-8">
+          <div className="flex-1 h-[1px] bg-white/10" />
+          <span className="text-white/40 text-xs">o con</span>
+          <div className="flex-1 h-[1px] bg-white/10" />
+        </div>
+
+        <div className="w-full space-y-3">
+          <button className="w-full bg-white rounded-full py-3 flex items-center justify-center gap-3 hover:bg-gray-100 transition-colors">
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            <span className="font-bold text-[#3d2b1f]">Google</span>
+          </button>
+
+          <button className="w-full bg-white rounded-full py-3 flex items-center justify-center gap-3 hover:bg-gray-100 transition-colors">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.05 20.28c-.96.95-2.04 1.44-3.23 1.44-1.16 0-2.14-.44-3.23-1.44-1.07-1.01-1.61-2.22-1.61-3.64 0-1.42.54-2.63 1.61-3.64 1.09-1 2.07-1.44 3.23-1.44 1.19 0 2.27.49 3.23 1.44 1.07 1.01 1.61 2.22 1.61 3.64 0 1.42-.54 2.63-1.61 3.64zM13.82 3.5c0 1.1-.89 2-2 2s-2-.9-2-2 .89-2 2-2 2 .9 2 2z"/>
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"/>
+              <path d="M12 6c-3.314 0-6 2.686-6 6s2.686 6 6 6 6-2.686 6-6-2.686-6-6-6zm0 10c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"/>
+            </svg>
+            <span className="font-bold text-[#3d2b1f]">Apple</span>
+          </button>
+        </div>
+
+        <div className="mt-auto pt-8 text-center">
+          <p className="text-white/30 text-[10px] leading-relaxed max-w-[250px]">
+            Al continuar, aceptas automáticamente nuestras Condiciones, Política de privacidad y Política de cookies.
+          </p>
         </div>
       </div>
     </div>

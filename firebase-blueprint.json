@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information and roles",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Presupuesto": {
+      "title": "Presupuesto",
+      "description": "Event request/budget details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "codigo": { "type": "string" },
+        "titulo": { "type": "string" },
+        "cliente_nombre": { "type": "string" },
+        "cliente_email": { "type": "string" },
+        "cliente_uid": { "type": "string" },
+        "tipo_evento": { "type": "string" },
+        "pax": { "type": "number" },
+        "fecha_evento": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "estado": { "type": "string", "enum": ["borrador", "enviado", "aprobado", "rechazado"] },
+        "created_date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["cliente_uid", "estado", "created_date"]
+    },
+    "Mail": {
+      "title": "Mail",
+      "description": "Email notification for Trigger Email extension",
+      "type": "object",
+      "properties": {
+        "to": { "type": "string" },
+        "message": {
+          "type": "object",
+          "properties": {
+            "subject": { "type": "string" },
+            "text": { "type": "string" },
+            "html": { "type": "string" }
+          }
+        }
+      },
+      "required": ["to", "message"]
+    },
+    "Bloqueo": {
+      "title": "Bloqueo de Fecha",
+      "description": "Dates where CateringApp is unavailable",
+      "type": "object",
+      "properties": {
+        "fecha": { "type": "string", "description": "ISO date string (YYYY-MM-DD)" },
+        "motivo": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fecha"]
+    },
+    "Evento": {
+      "title": "Evento",
+      "description": "Eventos confirmados y agendados",
+      "type": "object",
+      "properties": {
+        "titulo": { "type": "string" },
+        "fecha": { "type": "string", "description": "YYYY-MM-DD" },
+        "hora": { "type": "string" },
+        "cliente_nombre": { "type": "string" },
+        "cliente_email": { "type": "string" },
+        "cliente_telefono": { "type": "string" },
+        "presupuesto_id": { "type": "string" },
+        "tipo_evento": { "type": "string" },
+        "pax": { "type": "integer" },
+        "lugar": { "type": "string" },
+        "pago_estado": { "type": "string", "enum": ["pendiente", "paga_y_señal", "pagado"] },
+        "monto_pagado": { "type": "number" },
+        "notas": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["titulo", "fecha"]
+    },
+    "Plano": {
+      "title": "Plano de Sala",
+      "description": "Layout of tables and chairs for an event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cliente_uid": { "type": "string" },
+        "nombre": { "type": "string" },
+        "presupuesto_id": { "type": "string" },
+        "elementos": { "type": "array", "description": "List of tables, chairs, and other items" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["cliente_uid", "nombre", "elementos"]
+    },
+    "ChannelConnection": {
+      "title": "Channel Connection",
+      "description": "WhatsApp or other channel connection details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workspace_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "channel": { "type": "string", "enum": ["whatsapp"] },
+        "provider": { "type": "string", "enum": ["wazzap"] },
+        "is_official": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["not_connected", "pending_qr", "waiting_scan", "connecting", "connected", "error", "disconnected"] },
+        "phone_number": { "type": "string" },
+        "external_account_id": { "type": "string" },
+        "external_session_id": { "type": "string" },
+        "qr_code_value": { "type": "string" },
+        "qr_expires_at": { "type": "string", "format": "date-time" },
+        "accepted_terms_at": { "type": "string", "format": "date-time" },
+        "accepted_terms_version": { "type": "string" },
+        "last_sync_at": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "channel", "provider", "status"]
+    },
+    "ChannelConnectionLog": {
+      "title": "Channel Connection Log",
+      "description": "Logs for channel connection events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "connection_id": { "type": "string" },
+        "event_type": { "type": "string" },
+        "payload": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["connection_id", "event_type", "created_at"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/solicitudes/{id}": {
+      "schema": "Presupuesto",
+      "description": "Event budgets"
+    },
+    "/mail/{id}": {
+      "schema": "Mail",
+      "description": "Outgoing emails"
+    },
+    "/bloqueos/{id}": {
+      "schema": "Bloqueo",
+      "description": "Blocked dates for events"
+    },
+    "/eventos/{id}": {
+      "schema": "Evento",
+      "description": "Scheduled events"
+    },
+    "/planos/{id}": {
+      "schema": "Plano",
+      "description": "Seating and room layouts"
+    },
+    "/channel_connections/{id}": {
+      "schema": "ChannelConnection",
+      "description": "WhatsApp channel connections"
+    },
+    "/channel_connection_logs/{id}": {
+      "schema": "ChannelConnectionLog",
+      "description": "Logs for channel connections"
+    }
+  }
+}

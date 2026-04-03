@@ -1,5 +1,5 @@
 {
-  "name": "Presupuestos Arenas",
-  "description": "Aplicación de presupuestos basada en el repositorio presupuestos-arenas-base44",
+  "name": "Eventing",
+  "description": "Aplicación de presupuestos de catering, gestión de eventos y comunicaciones unificadas con WhatsApp",
   "requestFramePermissions": []
 }

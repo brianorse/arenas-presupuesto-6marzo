@@ -1,6 +1,6 @@
 export const createPageUrl = (page: string) => `/${page}`;
 
-export const LOGO_URL = 'https://drive.google.com/thumbnail?id=1jUPmclrOp5QoJMqIlvwOrTmHmR00C-0L&sz=w1000';
+export const LOGO_URL = 'https://cdn-icons-png.flaticon.com/512/3448/3448609.png'; // Minimalist cloche icon
 
 export const generateBudgetCode = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed similar chars like I, 1, O, 0
@@ -10,3 +10,5 @@ export const generateBudgetCode = () => {
   }
   return code;
 };
+
+export * from './reportGenerator';

@@ -27,7 +27,7 @@ export const base44 = {
       localStorage.removeItem('currentUser');
       window.location.href = '/Home';
     },
-    redirectToLogin: (url: string) => { 
+    redirectToLogin: (url?: string) => { 
       window.location.href = '/Login';
     }
   },
@@ -62,6 +62,12 @@ export const base44 = {
           return all[index];
         }
         return null;
+      },
+      delete: async (id: string) => {
+        const all = JSON.parse(localStorage.getItem('presupuestos') || '[]');
+        const filtered = all.filter((p: any) => p.id !== id);
+        localStorage.setItem('presupuestos', JSON.stringify(filtered));
+        return true;
       }
     },
     Cliente: {

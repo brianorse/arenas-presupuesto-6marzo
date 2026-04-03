@@ -8,19 +8,40 @@ export default function Step3Menu({ client, selectedItems, setSelectedItems, onN
   
   const handleAddItem = (item) => {
     const existing = selectedItems.find(i => i.id === item.id);
+    
+    // Special logic for appetizers and stations
+    let quantityToAdd = 1;
+    if (item.category === 'appetizers') {
+      quantityToAdd = client.pax || 1;
+    } else if (item.category === 'stations') {
+      quantityToAdd = 1;
+    }
+
     if (existing) {
+      // For appetizers and stations, we don't increment, we just keep the fixed quantity
+      if (item.category === 'appetizers' || item.category === 'stations') {
+        return;
+      }
       const updated = selectedItems.map(i => 
         i.id === item.id ? { ...i, quantity: (i.quantity || 1) + 1 } : i
       );
       setSelectedItems(updated);
     } else {
-      setSelectedItems([...selectedItems, { ...item, quantity: 1 }]);
+      setSelectedItems([...selectedItems, { ...item, quantity: quantityToAdd }]);
     }
   };
 
   const handleRemoveItem = (itemId) => {
     const existing = selectedItems.find(i => i.id === itemId);
-    if (existing && existing.quantity > 1) {
+    if (!existing) return;
+
+    // For appetizers and stations, remove completely
+    if (existing.category === 'appetizers' || existing.category === 'stations') {
+      setSelectedItems(selectedItems.filter(i => i.id !== itemId));
+      return;
+    }
+
+    if (existing.quantity > 1) {
       const updated = selectedItems.map(i => 
         i.id === itemId ? { ...i, quantity: i.quantity - 1 } : i
       );
@@ -166,6 +187,7 @@ export default function Step3Menu({ client, selectedItems, setSelectedItems, onN
                   src={CATEGORY_IMAGES[categoryKey]} 
                   alt={CATEGORY_LABELS[categoryKey]}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-6">
                   <h3 className="text-2xl sm:text-3xl font-bold text-white shadow-sm">
@@ -197,13 +219,24 @@ export default function Step3Menu({ client, selectedItems, setSelectedItems, onN
                       <div className="flex items-center justify-end pt-2 border-t border-[#f0e6db]">
                         {qty > 0 ? (
                           <div className="flex items-center gap-3">
-                            <button onClick={() => handleRemoveItem(item.id)} className="w-8 h-8 rounded-full bg-white text-[#654935] flex items-center justify-center hover:bg-[#ede3d6] transition-colors shadow-sm border border-[#e8ddd0]">
-                              <Minus className="w-4 h-4" />
-                            </button>
-                            <span className="font-bold text-[#3d2b1f] w-6 text-center text-lg">{qty}</span>
-                            <button onClick={() => handleAddItem(item)} className="w-8 h-8 rounded-full bg-[#654935] text-white flex items-center justify-center hover:bg-[#4a3627] transition-colors shadow-md">
-                              <Plus className="w-4 h-4" />
-                            </button>
+                            {(item.category === 'appetizers' || item.category === 'stations') ? (
+                              <button 
+                                onClick={() => handleRemoveItem(item.id)} 
+                                className="px-4 py-2 rounded-xl bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-all border border-red-100 flex items-center gap-2"
+                              >
+                                Quitar <Minus className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <>
+                                <button onClick={() => handleRemoveItem(item.id)} className="w-8 h-8 rounded-full bg-white text-[#654935] flex items-center justify-center hover:bg-[#ede3d6] transition-colors shadow-sm border border-[#e8ddd0]">
+                                  <Minus className="w-4 h-4" />
+                                </button>
+                                <span className="font-bold text-[#3d2b1f] w-6 text-center text-lg">{qty}</span>
+                                <button onClick={() => handleAddItem(item)} className="w-8 h-8 rounded-full bg-[#654935] text-white flex items-center justify-center hover:bg-[#4a3627] transition-colors shadow-md">
+                                  <Plus className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         ) : (
                           <button onClick={() => handleAddItem(item)} className="px-4 py-2 rounded-xl bg-[#faf7f4] text-[#654935] text-sm font-bold hover:bg-[#654935] hover:text-white transition-all border border-[#e8ddd0] flex items-center gap-2">

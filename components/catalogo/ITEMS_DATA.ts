@@ -216,7 +216,7 @@ export const CATALOG_ITEMS = [
     name: 'Estación de Vermut',
     description: 'Vermut artesano (blanco y negro), sifón, aceitunas, patatas chips y banderillas.',
     price: 3.50,
-    category: 'vermut',
+    category: 'mocktails',
     image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&q=80&w=800',
     pricingModel: 'per_person'
   },
